@@ -296,6 +296,10 @@ body {
   flex-wrap: wrap;
 }
 
+#restaurants-list .restaurant-img {
+  min-height: unset;
+}
+
 @media screen and (max-width: 379px) {
   #restaurants-list li{
     padding: 0 5px;
