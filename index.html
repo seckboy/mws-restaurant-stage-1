@@ -16,10 +16,11 @@
   </header>
 
   <main id="maincontent">
+    <a href="#non-map-container" class="skip-link">Skip past map</a>
     <section id="map-container">
       <div id="map"></div>
     </section>
-    <section id="non-map-container">
+    <section id="non-map-container" tabindex="-1">
       <div class="filter-options">
         <h2>Filter Results</h2>
         <select id="neighborhoods-select" name="neighborhoods" onchange="updateRestaurants()">
