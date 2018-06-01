@@ -330,6 +330,42 @@ body {
     margin: 10px;
   }
 
+  /****** restaurants page *********/
+
+  .inside #breadcrumb {
+    width: unset;
+  }
+
+  .inside header {
+    position: relative;
+    top: unset;
+  }
+  .inside #map-container {
+    position: relative;
+    height: 200px;
+    width: 100%;
+    right: unset;
+    top: unset;
+  }
+
+  .inside #restaurant-container, .inside #reviews-container {
+    width: 100%;
+    padding: 0;
+  }
+
+  .inside #restaurant-name {
+    font-size: 15pt;
+  }
+
+  .inside #restaurant-img{
+    display: none;
+  }
+
+  .inside #footer {
+    position: relative;
+    width: 100%;
+  }
+
 }
 
 @media screen and (min-width: 600px) {
