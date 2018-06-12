@@ -460,11 +460,6 @@ nav {
   margin: 0 0 10px;
 }
 
-/* STAGE 2 */
-.restaurant-no-img {
-  display: none;
-}
-
 @media screen and (max-width: 379px) {
   #restaurants-list li{
     padding: 0 5px;
