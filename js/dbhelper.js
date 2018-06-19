@@ -15,19 +15,60 @@ class DBHelper {
    * Fetch all restaurants.
    */
   static fetchRestaurants(callback) {
-    let xhr = new XMLHttpRequest();
-    xhr.open('GET', DBHelper.DATABASE_URL);
-    xhr.onload = () => {
-      if (xhr.status === 200) { // Got a success response from server!
-        const json = JSON.parse(xhr.responseText);
-        const restaurants = json;
-        callback(null, restaurants);
-      } else { // Oops!. Got an error from server.
-        const error = (`Request failed. Returned status of ${xhr.status}`);
+
+    const dbPromise = idb.open('restaurants-v1', 1, upgradeDB => {
+      upgradeDB.createObjectStore('restaurants');
+    });
+
+    /* First try to render with data from IndexedDB so site works offline and renders quickly if slow connection */
+    dbPromise.then(db => {
+      const tx = db.transaction('restaurants', 'readonly');
+      DBHelper.renderRestaurantsFromIDB(tx,callback);
+      tx.complete;
+    });
+
+    /*
+    Fetch data from api server, put in IndexedDB, call callback so that it renders
+    if there was no data yet in IndexedDB and so the page contains up-to-date data.
+    */
+    let restaurantsFromUrl = null;
+    fetch(DBHelper.DATABASE_URL)
+      .then(response => {
+        return response.json();
+      })
+      .then(restaurants => {
+        restaurantsFromUrl = restaurants;
+
+        dbPromise.then(db => {
+
+          /* Put the restaurants in IDB if the api server returns results */
+          const tx2 = db.transaction('restaurants', 'readwrite');
+          tx2.objectStore('restaurants').put(restaurantsFromUrl,'restaurants')
+            .then(success => {
+              console.log("successfully set idb with data from api server");
+              DBHelper.renderRestaurantsFromIDB(tx2,callback);
+            });
+          tx2.complete;
+        });
+      })
+      .catch( error => {
         callback(error, null);
-      }
-    };
-    xhr.send();
+      });
+  }
+
+  /**
+   * Retrieve restaurants from IDB
+   */
+
+  static renderRestaurantsFromIDB(transaction,callback){
+    transaction.objectStore('restaurants').get('restaurants')
+      .then(restaurantsFromIDB => {
+        console.log("successfully received data from IndexedDB");
+        callback(null, restaurantsFromIDB);
+      })
+      .catch(error => {
+        callback(error, null);
+      });
   }
 
   /**
