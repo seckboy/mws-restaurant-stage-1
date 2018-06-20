@@ -4,7 +4,7 @@
   "description": "Provide restaurant reviews.",
   "start_url": "/",
   "background_color": "#000000",
-  "theme_color": "#0f4a73",
+  "theme_color": "orange",
   "display": "minimal-ui",
   "icons": [{
     "src": "1.jpg",
