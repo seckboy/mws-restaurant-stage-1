@@ -1,0 +1,14 @@
+{
+  "name": "Restaurant Reviews",
+  "short_name": "Restaurant Reviews",
+  "description": "Provide restaurant reviews.",
+  "start_url": "/",
+  "background_color": "#000000",
+  "theme_color": "#0f4a73",
+  "display": "minimal-ui",
+  "icons": [{
+    "src": "1.jpg",
+    "sizes": "512x512",
+    "type": "image/jpg"
+  }]
+}
