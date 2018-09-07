@@ -182,8 +182,24 @@ createRestaurantHTML = (restaurant) => {
   const more = document.createElement('a');
   more.innerHTML = 'View Details';
   more.href = DBHelper.urlForRestaurant(restaurant);
+  more.className = 'details';
   more.setAttribute("aria-label",`view details about ${restaurant.name}`);
   li.append(more)
+
+  const checkbox = document.createElement('input');
+  checkbox.type = "checkbox";
+  checkbox.name = "favorite";
+  checkbox.value = "favorite";
+  checkbox.id = `favorite-${restaurant.id}`;
+  checkbox.onclick = event => DBHelper.handleFavoriteClick(checkbox.id);
+
+  const label = document.createElement('label')
+  label.htmlFor = checkbox.id;
+  label.appendChild(document.createTextNode('favorite'));
+
+  li.append(checkbox);
+  li.append(label);
+
 
   return li
 }

@@ -217,5 +217,39 @@ class DBHelper {
     return marker;
   } */
 
+  static updateFavorite(properties) {
+    fetch(properties.url,{method: properties.method});
+  }
+
+  static addToIDBQueue(properties){
+    const dbPromise = idb.open('apiQueue', 1, upgradeDB => {
+      upgradeDB.createObjectStore('apiQueue', {
+        autoIncrement : true,
+        keyPath: "id"
+      });
+    });
+
+    dbPromise.then(db => {
+
+      /* Put the restaurants in IDB if the api server returns results */
+      const tx2 = db.transaction('apiQueue', 'readwrite');
+      tx2.objectStore('apiQueue').put({url: properties.url, method: properties.method})
+        .then(success => {
+          console.log("successfully set idb with data from api server");
+        });
+      tx2.complete;
+    });
+
+
+  }
+
+  static handleFavoriteClick(elementId) {
+    const id = elementId.replace(/favorite\-/,'');
+    const isFavorite = document.getElementById(elementId).checked;
+    const url = `http://localhost:1337/restaurants/${id}/?is_favorite=${isFavorite}`;
+    const properties = {url: url, method: "PUT"};
+    this.addToIDBQueue(properties);
+    this.updateFavorite(properties);
+  }
 }
 
