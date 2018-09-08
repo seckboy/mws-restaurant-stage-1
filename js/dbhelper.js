@@ -3,6 +3,16 @@
  */
 class DBHelper {
 
+  static getIDBQueuePromise() {
+    const dbQueuePromise = idb.open('apiQueue', 1, upgradeDB => {
+      upgradeDB.createObjectStore('apiQueue', {
+        autoIncrement: true,
+        keyPath: "id"
+      });
+    });
+    return dbQueuePromise;
+  }
+
   /**
    * Database URL.
    * Change this to restaurants.json file location on your server.
@@ -217,21 +227,11 @@ class DBHelper {
     return marker;
   } */
 
-  static updateFavorite(properties) {
-    fetch(properties.url,{method: properties.method});
-  }
-
   static addToIDBQueue(properties){
-    const dbPromise = idb.open('apiQueue', 1, upgradeDB => {
-      upgradeDB.createObjectStore('apiQueue', {
-        autoIncrement : true,
-        keyPath: "id"
-      });
-    });
 
-    dbPromise.then(db => {
+    const dbQueuePromise = this.getIDBQueuePromise();
 
-      /* Put the restaurants in IDB if the api server returns results */
+    dbQueuePromise.then(db => {
       const tx2 = db.transaction('apiQueue', 'readwrite');
       tx2.objectStore('apiQueue').put({url: properties.url, method: properties.method})
         .then(success => {
@@ -240,7 +240,33 @@ class DBHelper {
       tx2.complete;
     });
 
+  }
 
+  static processIDBQueue(){
+
+    const dbQueuePromise = this.getIDBQueuePromise();
+
+    dbQueuePromise.then(db => {
+      const tx = db.transaction('apiQueue', 'readwrite');
+      tx.objectStore('apiQueue').openCursor()
+        .then(cursor => {
+          if(cursor) {
+            fetch(cursor.value.url,{method: cursor.value.method})
+              .then(response => {
+                return response.ok;
+              })
+              .then(deleteCursor => {
+                if(deleteCursor) {
+                  const tx2 = db.transaction('apiQueue', 'readwrite');
+                  tx2.objectStore('apiQueue').openCursor()
+                    .then(cursor => {
+                      cursor.delete().then(this.processIDBQueue());
+                    });
+                }
+              });
+          }
+        });
+    });
   }
 
   static handleFavoriteClick(elementId) {
@@ -249,7 +275,7 @@ class DBHelper {
     const url = `http://localhost:1337/restaurants/${id}/?is_favorite=${isFavorite}`;
     const properties = {url: url, method: "PUT"};
     this.addToIDBQueue(properties);
-    this.updateFavorite(properties);
+    this.processIDBQueue();
   }
 }
 
