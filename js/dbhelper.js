@@ -3,6 +3,13 @@
  */
 class DBHelper {
 
+  static getIDBRestaurantsPromise(){
+    const dbPromise = idb.open('restaurants-v1', 1, upgradeDB => {
+      upgradeDB.createObjectStore('restaurants');
+    });
+    return dbPromise;
+  }
+
   static getIDBQueuePromise() {
     const dbQueuePromise = idb.open('apiQueue', 1, upgradeDB => {
       upgradeDB.createObjectStore('apiQueue', {
@@ -26,9 +33,7 @@ class DBHelper {
    */
   static fetchRestaurants(callback) {
 
-    const dbPromise = idb.open('restaurants-v1', 1, upgradeDB => {
-      upgradeDB.createObjectStore('restaurants');
-    });
+    const dbPromise = this.getIDBRestaurantsPromise();
 
     /* First try to render with data from IndexedDB so site works offline and renders quickly if slow connection */
     dbPromise.then(db => {
@@ -269,6 +274,29 @@ class DBHelper {
     });
   }
 
+  static updateIDBFavorite(id,isFavorite){
+    const dbPromise = this.getIDBRestaurantsPromise();
+    dbPromise.then(db => {
+
+      const tx = db.transaction('restaurants', 'readwrite');
+      tx.objectStore('restaurants').get('restaurants')
+        .then(restaurantsFromIDB => {
+          restaurantsFromIDB.forEach(function(element,index) {
+            if(element.id == id) {
+              restaurantsFromIDB[index].is_favorite = isFavorite;
+            }
+          });
+          const tx2 = db.transaction('restaurants', 'readwrite');
+          tx2.objectStore('restaurants').put(restaurantsFromIDB,'restaurants');
+          tx2.complete;
+        })
+        .catch(error => {
+          console.log(error);
+        });
+
+    });
+    }
+
   static handleFavoriteClick(elementId) {
     const id = elementId.replace(/favorite\-/,'');
     const isFavorite = document.getElementById(elementId).checked;
@@ -276,6 +304,7 @@ class DBHelper {
     const properties = {url: url, method: "PUT"};
     this.addToIDBQueue(properties);
     this.processIDBQueue();
+    this.updateIDBFavorite(id,isFavorite);
   }
 }
 
