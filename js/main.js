@@ -191,6 +191,7 @@ createRestaurantHTML = (restaurant) => {
   checkbox.name = "favorite";
   checkbox.value = "favorite";
   checkbox.id = `favorite-${restaurant.id}`;
+  checkbox.checked = restaurant.is_favorite == "true";
   checkbox.onclick = event => DBHelper.handleFavoriteClick(checkbox.id);
 
   const label = document.createElement('label')
