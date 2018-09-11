@@ -334,5 +334,11 @@ class DBHelper {
     this.processIDBQueue();
     this.updateIDBFavorite(id,isFavorite);
   }
+
+  static handleReviewsSubmit(){
+    const form = document.getElementById('ratingForm');
+    alert(`${form.ratingSelect.value} ${form.ratingComments.value}`);
+    return false;
+  }
 }
 

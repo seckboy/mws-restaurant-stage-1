@@ -142,6 +142,8 @@ fillReviewsHTML = (reviews = self.restaurant.reviews) => {
   reviews.forEach(review => {
     ul.appendChild(createReviewHTML(review));
   });
+
+  ul.appendChild(createReviewFormHTML(self.restaurant.id));
   container.appendChild(ul);
 }
 
@@ -175,6 +177,61 @@ createReviewHTML = (review) => {
   comments.classList.add('comments');
   comments.innerHTML = review.comments;
   li.appendChild(comments);
+
+  return li;
+}
+
+/**
+ * Create review form HTML and add it to the webpage.
+ */
+createReviewFormHTML = (id) => {
+  const li = document.createElement('li');
+
+  const liHeaderDiv = document.createElement('div');
+  liHeaderDiv.classList.add('reviewHeader');
+
+  const name = document.createElement('span');
+  name.classList.add('reviewName');
+  name.innerHTML = "Add Your Review";
+  liHeaderDiv.appendChild(name);
+
+  li.appendChild(liHeaderDiv);
+
+  const ratingForm = document.createElement('form');
+  ratingForm.id = "ratingForm";
+
+  var restaurantId = document.createElement("input");
+  restaurantId.setAttribute("type", "hidden");
+  restaurantId.setAttribute("name", "restaurantId");
+  restaurantId.setAttribute("value", id);
+  ratingForm.appendChild(restaurantId);
+
+  const rating = document.createElement('div');
+  rating.classList.add('ratingForm');
+  rating.innerHTML = `Rating: `;
+  const ratingSelect = document.createElement('select');
+  ratingSelect.name = `ratingSelect`;
+  Array.from(Array(5).keys()).forEach(ratingNumber => {
+    var option = document.createElement("option");
+    option.text = ratingNumber + 1;
+    ratingSelect.add(option);
+  });
+  rating.appendChild(ratingSelect);
+  ratingForm.appendChild(rating);
+
+  const commentsTextArea = document.createElement('textarea');
+  commentsTextArea.classList.add('commentsTextArea');
+  commentsTextArea.name = 'ratingComments';
+  ratingForm.appendChild(commentsTextArea);
+
+  const ratingsSubmit = document.createElement('input');
+  ratingsSubmit.setAttribute("type", "submit");
+  ratingsSubmit.classList.add('commentsSubmit');
+  ratingForm.onsubmit = event => DBHelper.handleReviewsSubmit();
+
+  ratingForm.appendChild(ratingsSubmit);
+
+  li.appendChild(ratingForm);
 
   return li;
 }
