@@ -29,6 +29,14 @@ class DBHelper {
   }
 
   /**
+   * Database URL.
+   * Change this to restaurants.json file location on your server.
+   */
+  static get REVIEWS_URL() {
+    return `http://localhost:1337/reviews`;
+  }
+
+  /**
    * Fetch all restaurants.
    */
   static fetchRestaurants(callback) {
@@ -42,33 +50,53 @@ class DBHelper {
       tx.complete;
     });
 
-    /*
-    Fetch data from api server, put in IndexedDB, call callback so that it renders
-    if there was no data yet in IndexedDB and so the page contains up-to-date data.
-    */
+    let reviewsFromUrl = null;
     let restaurantsFromUrl = null;
-    fetch(DBHelper.DATABASE_URL)
+    let idIndexMap = new Map();
+    fetch(DBHelper.REVIEWS_URL)
       .then(response => {
         return response.json();
       })
-      .then(restaurants => {
-        restaurantsFromUrl = restaurants;
+      .then(reviews => {
+        reviewsFromUrl = reviews;
 
-        dbPromise.then(db => {
+        fetch(DBHelper.DATABASE_URL)
+          .then(response => {
+            return response.json();
+          })
+          .then(restaurants => {
+            restaurantsFromUrl = restaurants;
 
-          /* Put the restaurants in IDB if the api server returns results */
-          const tx2 = db.transaction('restaurants', 'readwrite');
-          tx2.objectStore('restaurants').put(restaurantsFromUrl,'restaurants')
-            .then(success => {
-              console.log("successfully set idb with data from api server");
-              DBHelper.renderRestaurantsFromIDB(tx2,callback);
+            restaurantsFromUrl.forEach((element,index) => {
+              restaurantsFromUrl[index].reviews=[];
+              restaurantsFromUrl[index].index=index;
+              idIndexMap.set(restaurantsFromUrl[index].id,index);
             });
-          tx2.complete;
-        });
+
+            reviewsFromUrl.forEach((review) =>{
+              console.log(`index ${idIndexMap.get(review.restaurant_id)} id ${review.restaurant_id}`);
+              restaurantsFromUrl[idIndexMap.get(review.restaurant_id)].reviews.push(review);
+            });
+
+            dbPromise.then(db => {
+
+              /* Put the restaurants in IDB if the api server returns results */
+              const tx2 = db.transaction('restaurants', 'readwrite');
+              tx2.objectStore('restaurants').put(restaurantsFromUrl,'restaurants')
+                .then(success => {
+                  console.log("successfully set idb with data from api server");
+                  DBHelper.renderRestaurantsFromIDB(tx2,callback);
+                });
+              tx2.complete;
+            });
+          })
       })
+
       .catch( error => {
         callback(error, null);
       });
+
+
   }
 
   /**
