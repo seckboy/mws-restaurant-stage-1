@@ -451,6 +451,7 @@ nav {
 
 .ratingForm {
   width: 400px;
+  margin: 5px auto;
 }
 
 .comments {
@@ -467,7 +468,7 @@ nav {
 
 .commentsSubmit{
   display: block;
-  margin: auto;
+  margin: 5px auto;
 }
 
 #reviews-list li p {
