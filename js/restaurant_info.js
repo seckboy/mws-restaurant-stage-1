@@ -55,6 +55,7 @@ initMap = () => {
  * Get current restaurant from page URL.
  */
 fetchRestaurantFromURL = (callback) => {
+  DBHelper.processIDBQueue();
   if (self.restaurant) { // restaurant already fetched!
     callback(null, self.restaurant)
     return;
@@ -202,7 +203,7 @@ createReviewFormHTML = (id) => {
 
   var restaurantId = document.createElement("input");
   restaurantId.setAttribute("type", "hidden");
-  restaurantId.setAttribute("name", "restaurantId");
+  restaurantId.setAttribute("name", "id");
   restaurantId.setAttribute("value", id);
   ratingForm.appendChild(restaurantId);
 
@@ -218,6 +219,12 @@ createReviewFormHTML = (id) => {
   });
   rating.appendChild(ratingSelect);
   ratingForm.appendChild(rating);
+
+  const ratingName = document.createElement('input');
+  ratingName.setAttribute("type", "text");
+  ratingName.classList.add('ratingName');
+  ratingName.name = 'ratingName';
+  ratingForm.appendChild(ratingName);
 
   const commentsTextArea = document.createElement('textarea');
   commentsTextArea.classList.add('commentsTextArea');

@@ -20,13 +20,25 @@ class DBHelper {
     return dbQueuePromise;
   }
 
+  static get DATABASE_HOST() {
+    return `http://localhost:1337`;
+  }
   /**
    * Database URL.
    * Change this to restaurants.json file location on your server.
    */
   static get DATABASE_URL() {
-    return `http://localhost:1337/restaurants`;
+    return `${DBHelper.DATABASE_HOST}/restaurants`;
   }
+
+  /**
+   * Database URL.
+   * Change this to restaurants.json file location on your server.
+   */
+  static get DATABASE_REVIEWS_URL() {
+    return `${DBHelper.DATABASE_HOST}/reviews`;
+  }
+
 
   /**
    * Database URL.
@@ -266,16 +278,20 @@ class DBHelper {
 
     dbQueuePromise.then(db => {
       const tx2 = db.transaction('apiQueue', 'readwrite');
-      tx2.objectStore('apiQueue').put({url: properties.url, method: properties.method})
+      tx2.objectStore('apiQueue').put({url: properties.url, method: properties.method, body: properties.body})
         .then(success => {
           console.log("successfully set idb with data from api server");
         });
       tx2.complete;
+    }).then(() => {
+      DBHelper.processIDBQueue();
     });
 
   }
 
   static processIDBQueue(){
+
+    console.log("processing idb queue");
 
     const dbQueuePromise = this.getIDBQueuePromise();
 
@@ -284,7 +300,7 @@ class DBHelper {
       tx.objectStore('apiQueue').openCursor()
         .then(cursor => {
           if(cursor) {
-            fetch(cursor.value.url,{method: cursor.value.method})
+            fetch(cursor.value.url,{method: cursor.value.method, body: cursor.value.body})
               .then(response => {
                 return response.ok;
               })
@@ -331,13 +347,28 @@ class DBHelper {
     const url = `http://localhost:1337/restaurants/${id}/?is_favorite=${isFavorite}`;
     const properties = {url: url, method: "PUT"};
     this.addToIDBQueue(properties);
-    this.processIDBQueue();
+    // this.processIDBQueue();
     this.updateIDBFavorite(id,isFavorite);
   }
 
   static handleReviewsSubmit(){
     const form = document.getElementById('ratingForm');
-    alert(`${form.ratingSelect.value} ${form.ratingComments.value}`);
+
+    const id = form.id.value;
+    const url = DBHelper.DATABASE_REVIEWS_URL;
+    const createdAt = Date.now();
+    const body = {
+      restaurant_id: id,
+      name: form.ratingName.value,
+      rating: form.ratingSelect.value,
+      comments: form.ratingComments.value,
+      createdAt: createdAt,
+      updatedAt: createdAt
+
+    }
+    const properties = {url: url, method: "POST", body: JSON.stringify(body)};
+    this.addToIDBQueue(properties);
+
     return false;
   }
 }
