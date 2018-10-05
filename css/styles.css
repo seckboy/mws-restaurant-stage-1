@@ -468,6 +468,10 @@ nav {
   font-size: 11pt;
 }
 
+.ratingNameLabel, .commentsLabel {
+  margin-top: 15px;
+}
+
 .commentsTextArea{
   width: 300px;
   height: 300px;

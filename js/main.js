@@ -71,20 +71,30 @@ fillCuisinesHTML = (cuisines = self.cuisines) => {
 /**
  * Initialize leaflet map, called from HTML.
  */
-initMap = () => {
-  self.newMap = L.map('map', {
+initMap = async () => {
+  // See if there are api calls saved in queue and, if online, run and delete them from the queue
+  await DBHelper.tryQueue();
+
+  try {
+    if (L) {
+      self.newMap = L.map('map', {
         center: [40.722216, -73.987501],
         zoom: 12,
         scrollWheelZoom: false
       });
-  L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.jpg70?access_token={mapboxToken}', {
-    mapboxToken: 'pk.eyJ1Ijoic2Vja2JveSIsImEiOiJjamltZ2Z5ZXAwM3ZkM3ZtaDM4dm5yMXE3In0.rvy_ZyeS_TK3JAbX9tyLLw',
-    maxZoom: 18,
-    attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, ' +
-      '<a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
-      'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-    id: 'mapbox.streets'
-  }).addTo(newMap);
+      L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.jpg70?access_token={mapboxToken}', {
+        mapboxToken: 'pk.eyJ1Ijoic2Vja2JveSIsImEiOiJjamltZ2Z5ZXAwM3ZkM3ZtaDM4dm5yMXE3In0.rvy_ZyeS_TK3JAbX9tyLLw',
+        maxZoom: 18,
+        attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, ' +
+          '<a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+          'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+        id: 'mapbox.streets'
+      }).addTo(newMap);
+    }
+  }catch(err) {
+    console.log("ERROR GETTING MAP");
+    console.log(err.message);
+  }
 
   updateRestaurants();
 }
@@ -191,16 +201,19 @@ createRestaurantHTML = (restaurant) => {
   checkbox.name = "favorite";
   checkbox.value = "favorite";
   checkbox.id = `favorite-${restaurant.id}`;
-  checkbox.checked = restaurant.is_favorite == "true";
+  checkbox.checked = restaurant.is_favorite == "true" || restaurant.is_favorite == true;
   checkbox.onclick = event => DBHelper.handleFavoriteClick(checkbox.id);
+  checkbox.role = "checkbox";
+  checkbox.setAttribute("aria-checked",restaurant.is_favorite == "true" || restaurant.is_favorite == true);
+  checkbox.setAttribute("aria-labelledby",`favorite-label-${restaurant.id}`);
 
-  const label = document.createElement('label')
+  const label = document.createElement('label');
+  label.id = `favorite-label-${restaurant.id}`;
   label.htmlFor = checkbox.id;
   label.appendChild(document.createTextNode('favorite'));
 
   li.append(checkbox);
   li.append(label);
-
 
   return li
 }

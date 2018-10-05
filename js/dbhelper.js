@@ -10,7 +10,14 @@ class DBHelper {
     return dbPromise;
   }
 
-  static getIDBQueuePromise() {
+  static getIDBReviewsPromise(){
+    const dbPromise = idb.open('reviews', 1, upgradeDB => {
+      upgradeDB.createObjectStore('reviews');
+    });
+    return dbPromise;
+  }
+
+  static  getIDBQueuePromise() {
     const dbQueuePromise = idb.open('apiQueue', 1, upgradeDB => {
       upgradeDB.createObjectStore('apiQueue', {
         autoIncrement: true,
@@ -62,53 +69,25 @@ class DBHelper {
       tx.complete;
     });
 
-    let reviewsFromUrl = null;
     let restaurantsFromUrl = null;
-    let idIndexMap = new Map();
-    fetch(DBHelper.REVIEWS_URL)
+    fetch(DBHelper.DATABASE_URL)
       .then(response => {
         return response.json();
       })
-      .then(reviews => {
-        reviewsFromUrl = reviews;
+      .then(restaurants => {
+        restaurantsFromUrl = restaurants;
 
-        fetch(DBHelper.DATABASE_URL)
-          .then(response => {
-            return response.json();
-          })
-          .then(restaurants => {
-            restaurantsFromUrl = restaurants;
+        dbPromise.then(db => {
 
-            restaurantsFromUrl.forEach((element,index) => {
-              restaurantsFromUrl[index].reviews=[];
-              restaurantsFromUrl[index].index=index;
-              idIndexMap.set(restaurantsFromUrl[index].id,index);
+          /* Put the restaurants in IDB if the api server returns results */
+          const tx2 = db.transaction('restaurants', 'readwrite');
+          tx2.objectStore('restaurants').put(restaurantsFromUrl,'restaurants')
+            .then(success => {
+              DBHelper.renderRestaurantsFromIDB(tx2,callback);
             });
-
-            reviewsFromUrl.forEach((review) =>{
-              console.log(`index ${idIndexMap.get(review.restaurant_id)} id ${review.restaurant_id}`);
-              restaurantsFromUrl[idIndexMap.get(review.restaurant_id)].reviews.push(review);
-            });
-
-            dbPromise.then(db => {
-
-              /* Put the restaurants in IDB if the api server returns results */
-              const tx2 = db.transaction('restaurants', 'readwrite');
-              tx2.objectStore('restaurants').put(restaurantsFromUrl,'restaurants')
-                .then(success => {
-                  console.log("successfully set idb with data from api server");
-                  DBHelper.renderRestaurantsFromIDB(tx2,callback);
-                });
-              tx2.complete;
-            });
-          })
-      })
-
-      .catch( error => {
-        callback(error, null);
+          tx2.complete;
+        });
       });
-
-
   }
 
   /**
@@ -118,7 +97,6 @@ class DBHelper {
   static renderRestaurantsFromIDB(transaction,callback){
     transaction.objectStore('restaurants').get('restaurants')
       .then(restaurantsFromIDB => {
-        console.log("successfully received data from IndexedDB");
         callback(null, restaurantsFromIDB);
       })
       .catch(error => {
@@ -186,7 +164,7 @@ class DBHelper {
       if (error) {
         callback(error, null);
       } else {
-        let results = restaurants
+        let results = restaurants;
         if (cuisine != 'all') { // filter by cuisine
           results = results.filter(r => r.cuisine_type == cuisine);
         }
@@ -272,54 +250,205 @@ class DBHelper {
     return marker;
   } */
 
-  static addToIDBQueue(properties){
+  static async tryQueue(){
+    let resultsOfProcessingQueue  = await DBHelper.getResultsOfProcessingQueue();
+    let deletePromises = [];
+    resultsOfProcessingQueue.forEach(([result]) => {
+      const mypromise = DBHelper.getDeleteQueueItemPromise(result);
+      deletePromises.push(mypromise);
+    });
+    await DBHelper.deleteProcessedQueueItems(deletePromises);
+  }
 
-    const dbQueuePromise = this.getIDBQueuePromise();
+  static async getResultsOfProcessingQueue(){
+    let promise1 = this.getIDBQueuePromise()
+      .then(async db => {
+        return await DBHelper.processQueue(db);
+      });
+    let [promiseArray] = await Promise.all([promise1]);
+    return promiseArray;
+  }
 
-    dbQueuePromise.then(db => {
-      const tx2 = db.transaction('apiQueue', 'readwrite');
-      tx2.objectStore('apiQueue').put({url: properties.url, method: properties.method, body: properties.body})
-        .then(success => {
-          console.log("successfully set idb with data from api server");
+  static async processQueue(db){
+    let promiseArray = [];
+    const tx = db.transaction('apiQueue', 'readwrite');
+    tx.objectStore('apiQueue').iterateCursor(async cursor => {
+      if (!cursor) return;
+      let promise1 = DBHelper.awaitfetch(cursor.value.url,cursor.primaryKey,cursor.value.method,cursor.value.body);
+      promiseArray.push(promise1);
+      cursor.continue();
+    });
+    return tx.complete.then(() => {
+      return Promise.all(promiseArray);
+    });
+  }
+
+  static async awaitfetch(url,id,method,body){
+    let mypromise = fetch(url,{method: method, body: body})
+      .then(response => {
+        return { id: id, status: response.ok, body: body};
+      })
+      .catch(error => {
+        console.log(error);
+        return {status: false, body: body};
+      });
+    return await Promise.all([mypromise]);
+  }
+
+  static async getDeleteQueueItemPromise(queueResult){
+    let myresult = DBHelper.getIDBQueuePromise()
+      .then(db => {
+        const tx = db.transaction('apiQueue', 'readonly');
+        return tx.objectStore('apiQueue').get(queueResult.id)
+          .then(() => {
+            if(queueResult.status) {
+              const txdel = db.transaction('apiQueue', 'readwrite');
+              txdel.objectStore('apiQueue').delete(queueResult.id);
+              txdel.complete;
+              return true;
+            }
+            return false;
+          });
+        tx.complete;
+      });
+    return myresult;
+  }
+
+  static async deleteProcessedQueueItems(deletePromiseArray){
+    Promise.all(deletePromiseArray)
+      .catch(error => {
+        console.log(error);
+      });
+  }
+
+  static async getReviewsFromServer(id){
+
+    let mypromise = fetch(`${DBHelper.DATABASE_REVIEWS_URL}?restaurant_id=${id}`,{method: "GET"})
+      .then(response => {
+        return response.json();
+      })
+      .then(lreviews => {
+        return lreviews;
+      })
+      .catch(() => {
+        return false;
+      });
+
+    let awaitResult = Promise.all([mypromise]);
+    let [[finalResult]] = await Promise.all([awaitResult]);
+    return finalResult;
+  }
+
+  static async updateIDBReviews(reviews,id){
+    const dbPromise = this.getIDBReviewsPromise();
+    let promise = dbPromise.then(db => {
+      const tx2 = db.transaction('reviews', 'readwrite');
+      tx2.objectStore('reviews').put(reviews,id)
+        .then(() => {
+          console.log("successfully updated idb with server reviews");
         });
       tx2.complete;
-    }).then(() => {
-      DBHelper.processIDBQueue();
     });
+    await Promise.all([promise]);
 
   }
 
-  static processIDBQueue(){
+  static async getIDBReviews(id){
+    const dbPromise = this.getIDBReviewsPromise();
+    let promise = dbPromise.then(db => {
+      const tx2 = db.transaction('reviews', 'readonly');
+      let result = tx2.objectStore('reviews').get(parseInt(id))
+        .then(reviews => {
+          return reviews;
+        })
+        .catch(error => {
+          console.log(error);
+          return false;
+        });
+      tx2.complete;
+      return result;
+    });
 
-    console.log("processing idb queue");
+    let [finalResult] = await Promise.all([promise]);
+    return finalResult;
+  }
+
+  static async handleReviewsSubmit(){
+    const form = document.getElementById('ratingForm');
+
+    const id = form.id.value;
+    const url = DBHelper.DATABASE_REVIEWS_URL;
+    const createdAt = Date.now();
+    const body = {
+      restaurant_id: id,
+      name: form.ratingName.value,
+      rating: form.ratingSelect.value,
+      comments: form.ratingComments.value,
+      createdAt: createdAt,
+      updatedAt: createdAt
+    }
+
+    const properties = {url: url, method: "POST", body: JSON.stringify(body), type: "addReview"};
+    await this.addReviewToIDB(id,properties);
+    DBHelper.addToIDBQueue(properties);
+  }
+
+  static async addReviewToIDB(id,properties){
+    let idbreviews = await DBHelper.getIDBReviews(id);
+    if(idbreviews) {
+      idbreviews.push(JSON.parse(properties.body));
+    }
+
+    const dbPromise = this.getIDBReviewsPromise();
+    let nextpromise = dbPromise.then(db => {
+      const tx2 = db.transaction('reviews', 'readwrite');
+      tx2.objectStore('reviews').put(idbreviews,parseInt(id))
+        .then(success => {
+          console.log("successfully set idb with submitted review");
+        })
+        .catch(error => {
+          console.log(error);
+        });
+      ;
+      tx2.complete;
+    });
+
+    await Promise.all([nextpromise]);
+  }
+
+  static async addToIDBQueue(properties){
 
     const dbQueuePromise = this.getIDBQueuePromise();
 
-    dbQueuePromise.then(db => {
-      const tx = db.transaction('apiQueue', 'readwrite');
-      tx.objectStore('apiQueue').openCursor()
-        .then(cursor => {
-          if(cursor) {
-            fetch(cursor.value.url,{method: cursor.value.method, body: cursor.value.body})
-              .then(response => {
-                return response.ok;
-              })
-              .then(deleteCursor => {
-                if(deleteCursor) {
-                  const tx2 = db.transaction('apiQueue', 'readwrite');
-                  tx2.objectStore('apiQueue').openCursor()
-                    .then(cursor => {
-                      cursor.delete().then(this.processIDBQueue());
-                    });
-                }
-              });
-          }
+    let mypromise = dbQueuePromise.then(db => {
+      const tx2 = db.transaction('apiQueue', 'readwrite');
+      return tx2.objectStore('apiQueue').put({url: properties.url, method: properties.method, body: properties.body, type: properties.type})
+        .then(() => {
+          console.log("successfully set idb with data from api server");
+          return true;
         });
-    });
+      tx2.complete;
+    })
+      .catch(error => {
+        console.log(error);
+        return false;
+      });
+
+    let [addToQueueResult] = await Promise.all([mypromise]);
+    if(addToQueueResult) DBHelper.tryQueue();
+  }
+
+  static async handleFavoriteClick(elementId) {
+    const id = elementId.replace(/favorite\-/,'');
+    const isFavorite = document.getElementById(elementId).checked;
+    const url = `http://localhost:1337/restaurants/${id}/?is_favorite=${isFavorite}`;
+    const properties = {url: url, method: "PUT", type: "favorite"};
+    await DBHelper.updateIDBFavorite(id,isFavorite);
+    DBHelper.addToIDBQueue(properties);
   }
 
   static updateIDBFavorite(id,isFavorite){
-    const dbPromise = this.getIDBRestaurantsPromise();
+    const dbPromise = DBHelper.getIDBRestaurantsPromise();
     dbPromise.then(db => {
 
       const tx = db.transaction('restaurants', 'readwrite');
@@ -341,35 +470,10 @@ class DBHelper {
     });
     }
 
-  static handleFavoriteClick(elementId) {
-    const id = elementId.replace(/favorite\-/,'');
-    const isFavorite = document.getElementById(elementId).checked;
-    const url = `http://localhost:1337/restaurants/${id}/?is_favorite=${isFavorite}`;
-    const properties = {url: url, method: "PUT"};
-    this.addToIDBQueue(properties);
-    // this.processIDBQueue();
-    this.updateIDBFavorite(id,isFavorite);
-  }
 
-  static handleReviewsSubmit(){
-    const form = document.getElementById('ratingForm');
 
-    const id = form.id.value;
-    const url = DBHelper.DATABASE_REVIEWS_URL;
-    const createdAt = Date.now();
-    const body = {
-      restaurant_id: id,
-      name: form.ratingName.value,
-      rating: form.ratingSelect.value,
-      comments: form.ratingComments.value,
-      createdAt: createdAt,
-      updatedAt: createdAt
 
-    }
-    const properties = {url: url, method: "POST", body: JSON.stringify(body)};
-    this.addToIDBQueue(properties);
 
-    return false;
-  }
+
 }
 

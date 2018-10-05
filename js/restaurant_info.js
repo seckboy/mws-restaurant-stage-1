@@ -15,7 +15,7 @@ initMap = () => {
   fetchRestaurantFromURL((error, restaurant) => {
     if (error) { // Got an error!
       console.error(error);
-    } else {      
+    } else {
       self.newMap = L.map('map', {
         center: [restaurant.latlng.lat, restaurant.latlng.lng],
         zoom: 16,
@@ -54,24 +54,23 @@ initMap = () => {
 /**
  * Get current restaurant from page URL.
  */
-fetchRestaurantFromURL = (callback) => {
-  DBHelper.processIDBQueue();
-  if (self.restaurant) { // restaurant already fetched!
-    callback(null, self.restaurant)
-    return;
-  }
+fetchRestaurantFromURL = async (callback) => {
+
   const id = getParameterByName('id');
   if (!id) { // no id found in URL
     error = 'No restaurant id in URL'
     callback(error, null);
   } else {
+    // See if there are api calls saved in queue and, if online, run and delete them from the queue
+    await DBHelper.tryQueue();
+
     DBHelper.fetchRestaurantById(id, (error, restaurant) => {
       self.restaurant = restaurant;
       if (!restaurant) {
         console.error(error);
         return;
       }
-      fillRestaurantHTML();
+      fillRestaurantHTML(self.restaurant);
       callback(null, restaurant)
     });
   }
@@ -82,7 +81,12 @@ fetchRestaurantFromURL = (callback) => {
  */
 fillRestaurantHTML = (restaurant = self.restaurant) => {
   const name = document.getElementById('restaurant-name');
-  name.innerHTML = restaurant.name;
+  name.innerHTML = "";
+  const nameAnchor = document.createElement('a');
+  nameAnchor.name = "nameAnchor";
+  nameAnchor.innerHTML = restaurant.name;
+  name.appendChild(nameAnchor);
+  // name.innerHTML = restaurant.name;
 
   const address = document.getElementById('restaurant-address');
   address.innerHTML = restaurant.address;
@@ -94,14 +98,19 @@ fillRestaurantHTML = (restaurant = self.restaurant) => {
   image.alt = restaurant.photograph_alt;
 
   const cuisine = document.getElementById('restaurant-cuisine');
-  cuisine.innerHTML = restaurant.cuisine_type;
+  cuisine.innerHTML = "";
+  const cuisineAnchor = document.createElement('a');
+  cuisineAnchor.name = "cuisineAnchor";
+  cuisineAnchor.innerHTML = restaurant.cuisine_type;
+  cuisine.appendChild(cuisineAnchor);
+  // cuisine.innerHTML = restaurant.cuisine_type;
 
   // fill operating hours
   if (restaurant.operating_hours) {
     fillRestaurantHoursHTML();
   }
   // fill reviews
-  fillReviewsHTML();
+  fillReviewsHTML(restaurant.id);
 }
 
 /**
@@ -109,6 +118,7 @@ fillRestaurantHTML = (restaurant = self.restaurant) => {
  */
 fillRestaurantHoursHTML = (operatingHours = self.restaurant.operating_hours) => {
   const hours = document.getElementById('restaurant-hours');
+  hours.innerHTML = "";
   for (let key in operatingHours) {
     const row = document.createElement('tr');
 
@@ -123,28 +133,40 @@ fillRestaurantHoursHTML = (operatingHours = self.restaurant.operating_hours) => 
     row.appendChild(time);
 
     hours.appendChild(row);
+    console.log(`appending child ${row}`);
   }
 }
 
 /**
  * Create all reviews HTML and add them to the webpage.
  */
-fillReviewsHTML = (reviews = self.restaurant.reviews) => {
+// fillReviewsHTML = async (restaurant = self.restaurant, getnew = true) => {
+fillReviewsHTML = async (id, getReviewsFromUrl = true) => {
+
+  if(getReviewsFromUrl){
+    let awaitresult = await DBHelper.getReviewsFromServer(id);
+    if(awaitresult) {
+      await DBHelper.updateIDBReviews(awaitresult, id);
+    }
+  }
+
+  let idbreviews = await DBHelper.getIDBReviews(id);
+
   const container = document.getElementById('reviews-container');
 
-  if (!reviews) {
+  if (!idbreviews) {
     const noReviews = document.createElement('p');
     noReviews.innerHTML = 'No reviews yet!';
     container.appendChild(noReviews);
     return;
   }
+
   const ul = document.getElementById('reviews-list');
   ul.innerHTML = '';
-  reviews.forEach(review => {
+  idbreviews.forEach(review => {
     ul.appendChild(createReviewHTML(review));
   });
-
-  ul.appendChild(createReviewFormHTML(self.restaurant.id));
+  ul.appendChild(createReviewFormHTML(id));
   container.appendChild(ul);
 }
 
@@ -200,6 +222,7 @@ createReviewFormHTML = (id) => {
 
   const ratingForm = document.createElement('form');
   ratingForm.id = "ratingForm";
+  ratingForm.setAttribute("method","post");
 
   var restaurantId = document.createElement("input");
   restaurantId.setAttribute("type", "hidden");
@@ -220,12 +243,20 @@ createReviewFormHTML = (id) => {
   rating.appendChild(ratingSelect);
   ratingForm.appendChild(rating);
 
+  const ratingNameLabel = document.createElement('div');
+  ratingNameLabel.innerHTML = "Your name:";
+  ratingNameLabel.classList.add('ratingNameLabel');
+  ratingForm.appendChild(ratingNameLabel);
   const ratingName = document.createElement('input');
   ratingName.setAttribute("type", "text");
   ratingName.classList.add('ratingName');
   ratingName.name = 'ratingName';
   ratingForm.appendChild(ratingName);
 
+  const commentsLabel = document.createElement('div');
+  commentsLabel.innerHTML = "Comments:";
+  commentsLabel.classList.add('commentsLabel');
+  ratingForm.appendChild(commentsLabel);
   const commentsTextArea = document.createElement('textarea');
   commentsTextArea.classList.add('commentsTextArea');
   commentsTextArea.name = 'ratingComments';
@@ -234,7 +265,11 @@ createReviewFormHTML = (id) => {
   const ratingsSubmit = document.createElement('input');
   ratingsSubmit.setAttribute("type", "submit");
   ratingsSubmit.classList.add('commentsSubmit');
-  ratingForm.onsubmit = event => DBHelper.handleReviewsSubmit();
+  ratingForm.onsubmit = async event => {
+    event.preventDefault();
+    await DBHelper.handleReviewsSubmit();
+    fillReviewsHTML(id,false);
+  };
 
   ratingForm.appendChild(ratingsSubmit);
 
