@@ -232,9 +232,13 @@ createReviewFormHTML = (id) => {
 
   const rating = document.createElement('div');
   rating.classList.add('ratingForm');
-  rating.innerHTML = `Rating: `;
+  const ratingLabel = document.createElement('label');
+  ratingLabel.innerHTML = `Rating: `;
+  ratingLabel.setAttribute("for","ratingSelect");
+  rating.appendChild(ratingLabel);
   const ratingSelect = document.createElement('select');
   ratingSelect.name = `ratingSelect`;
+  ratingSelect.id = 'ratingSelect';
   Array.from(Array(5).keys()).forEach(ratingNumber => {
     var option = document.createElement("option");
     option.text = ratingNumber + 1;
@@ -243,7 +247,8 @@ createReviewFormHTML = (id) => {
   rating.appendChild(ratingSelect);
   ratingForm.appendChild(rating);
 
-  const ratingNameLabel = document.createElement('div');
+  const ratingNameLabel = document.createElement('label');
+  ratingNameLabel.setAttribute("for","ratingName");
   ratingNameLabel.innerHTML = "Your name:";
   ratingNameLabel.classList.add('ratingNameLabel');
   ratingForm.appendChild(ratingNameLabel);
@@ -251,15 +256,18 @@ createReviewFormHTML = (id) => {
   ratingName.setAttribute("type", "text");
   ratingName.classList.add('ratingName');
   ratingName.name = 'ratingName';
+  ratingName.id = 'ratingName';
   ratingForm.appendChild(ratingName);
 
-  const commentsLabel = document.createElement('div');
+  const commentsLabel = document.createElement('label');
+  commentsLabel.setAttribute("for","ratingComments");
   commentsLabel.innerHTML = "Comments:";
   commentsLabel.classList.add('commentsLabel');
   ratingForm.appendChild(commentsLabel);
   const commentsTextArea = document.createElement('textarea');
   commentsTextArea.classList.add('commentsTextArea');
   commentsTextArea.name = 'ratingComments';
+  commentsTextArea.id = 'ratingComments';
   ratingForm.appendChild(commentsTextArea);
 
   const ratingsSubmit = document.createElement('input');

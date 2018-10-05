@@ -469,6 +469,7 @@ nav {
 }
 
 .ratingNameLabel, .commentsLabel {
+  display: block;
   margin-top: 15px;
 }
 
